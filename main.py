@@ -245,6 +245,16 @@ def score(name):
     return c1 + c2 + c3 + c4 + criterion_5(word_count(text))
 
 
+def tiebreak(name):
+    # Ties on the total are broken the way the judge weighs the
+    # criteria: scheme + sting (criteria 3 and 4) outrank mere
+    # word-count closeness, because a nearer word count never
+    # rescues a weaker scheme or a softer sting. Word-count
+    # distance is the last resort, then the name for determinism.
+    _, _, c3, c4 = CRITERIA_1_TO_4[name]
+    return (-(c3 + c4), abs(word_count(CANDIDATES[name]) - 100), name)
+
+
 def main():
     # Every candidate must pass the same hard rules the sealed
     # scorer's gate enforces, before any judging can happen.
@@ -259,11 +269,21 @@ def main():
         if hit is not None:
             fail(f"{name} announces its tiredness with {hit!r}")
 
-    ranked = sorted(CANDIDATES, key=lambda n: (-score(n), abs(word_count(CANDIDATES[n]) - 100)))
+    ranked = sorted(CANDIDATES, key=lambda n: (-score(n), *tiebreak(n)))
     print("candidate scores (out of 25):")
     for name in ranked:
         print(f"  {name}: {score(name)} ({word_count(CANDIDATES[name])} words, "
               f"{len(CANDIDATES[name])} chars)")
+
+    # Verification: the ranking must be a strict order with a single
+    # clear winner -- a tie at the top means the scoring cannot pick
+    # an entry, and two identical drafts would make the ranking
+    # meaningless. Fail loudly instead of writing an arbitrary pick.
+    if len(set(CANDIDATES.values())) != len(CANDIDATES):
+        fail("two candidates share the same monologue text")
+    if len(ranked) > 1 and score(ranked[1]) == score(ranked[0]):
+        fail(f"top score {score(ranked[0])} is tied between "
+             f"{ranked[0]} and {ranked[1]}; no clear winner")
 
     winner = ranked[0]
     text = CANDIDATES[winner]
